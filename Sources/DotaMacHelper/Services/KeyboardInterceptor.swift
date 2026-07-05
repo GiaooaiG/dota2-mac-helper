@@ -4,7 +4,7 @@ import AppKit
 
 /// 键盘拦截核心：CGEventTap 实现 4 大功能
 ///
-/// 1. 屏蔽 Command+Q
+/// 1. 屏蔽 Command+Q/W
 /// 2. 交换左 Command/Option
 /// 3. 交换右 Command/Option
 /// 4. F1-F12 媒体键转标准功能键
@@ -128,7 +128,7 @@ final class KeyboardInterceptor {
 
         switch type {
         case .keyDown:
-            // 屏蔽 Command+Q
+            // 屏蔽 Command+Q/W
             if state.blockCmdQ {
                 let result = handleBlockCommandQ(event: event)
                 if result == nil { return nil } // 已吞掉
@@ -146,16 +146,16 @@ final class KeyboardInterceptor {
         return Unmanaged.passUnretained(event)
     }
 
-    // MARK: - 功能 1：屏蔽 Command+Q
+    // MARK: - 功能 1：屏蔽 Command+Q/W
 
-    /// keyCode 12 = Q 键。flags 用 contains 判断（flags 可能含其他 bit）。
-    /// 只拦截 keyDown，keyUp 不用管（系统看 keyDown 触发菜单）。
+    /// keyCode 12 = Q 键, 13 = W 键。flags 用 contains 判断（flags 可能含其他 bit）。
+
     @MainActor
     private func handleBlockCommandQ(event: CGEvent) -> Unmanaged<CGEvent>? {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
-        if flags.contains(.maskCommand) && keyCode == 12 { // kVK_ANSI_Q = 0x0C = 12
+        if flags.contains(.maskCommand) && (keyCode == 12 || keyCode == 13) {
             return nil // 吞掉，下游看不到
         }
         return Unmanaged.passUnretained(event)

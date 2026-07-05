@@ -129,8 +129,8 @@ struct ContentView: View {
             featureRow(
                 icon: "rectangle.slash",
                 color: .red,
-                title: "屏蔽 Command+Q",
-                desc: "防止误触退出当前应用",
+                title: "屏蔽 Command+Q/W",
+                desc: "防止误触退出/关闭窗口",
                 isOn: $state.blockCmdQ
             )
             Divider().padding(.vertical, 2)

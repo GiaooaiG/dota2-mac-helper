@@ -2,7 +2,7 @@
 
 为 Mac 玩 Dota 2 设计的键盘拦截工具，解决 macOS 上键位习惯冲突：
 
-- **屏蔽 Command+Q** — 防止误触退出游戏/应用
+- **屏蔽 Command+Q/W** — 防止误触退出游戏/关闭窗口
 - **交换左 Command / Option** — 左侧 Win ↔ Alt 互换（适配 PC 键盘习惯）
 - **交换右 Command / Option** — 右侧 Win ↔ Alt 互换
 - **F1-F12 标准功能键** — 屏蔽媒体键，F1-F12 直接发送按键
@@ -53,18 +53,6 @@ open DotaMacHelper.xcodeproj
 - `Cmd+R` 运行（或 `Cmd+B` 仅构建）
 
 构建产物在 `build/DotaMacHelper.app`。
-
-### 4. 命令行构建（可选）
-
-```bash
-xcodebuild -project DotaMacHelper.xcodeproj \
-           -scheme DotaMacHelper \
-           -configuration Release \
-           -derivedDataPath build \
-           build
-```
-
-产物路径：`build/Build/Products/Release/DotaMacHelper.app`
 
 ## 首次运行
 
