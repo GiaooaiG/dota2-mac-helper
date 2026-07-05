@@ -118,6 +118,14 @@ final class KeyboardInterceptor {
             return handleMediaKey(event: event)
         }
 
+        // Swap modifier flags on key events to match logical (swapped) modifier state.
+        // keyDown/keyUp events carry HID-level flags reflecting physical state;
+        // we override them so applications see the correct swapped modifier combination.
+        if (type == .keyDown || type == .keyUp),
+           state.swapLeftCmdOpt || state.swapRightCmdOpt {
+            swapModifierFlags(on: event)
+        }
+
         switch type {
         case .keyDown:
             // 屏蔽 Command+Q
@@ -318,6 +326,44 @@ final class KeyboardInterceptor {
         default:
             return []
         }
+    }
+
+    /// Swap modifier flags on keyDown/keyUp events to match the swapped logical modifier state.
+    /// The HID system sets flags based on physical key state; we need to swap them
+    /// so that applications see the correct logical modifier combination.
+    private func swapModifierFlags(on event: CGEvent) {
+        let rawFlags = event.flags.rawValue
+        var newRaw = rawFlags
+
+        // Swap public flags (maskCommand to maskAlternate)
+        let hasCmd = (rawFlags & CGEventFlags.maskCommand.rawValue) != 0
+        let hasOpt = (rawFlags & CGEventFlags.maskAlternate.rawValue) != 0
+        if hasCmd != hasOpt {
+            newRaw ^= CGEventFlags.maskCommand.rawValue
+            newRaw ^= CGEventFlags.maskAlternate.rawValue
+        }
+
+        // Swap device side bits for left modifiers
+        if state.swapLeftCmdOpt {
+            let leftCmdSet = (rawFlags & SideMask.leftCommand) != 0
+            let leftOptSet = (rawFlags & SideMask.leftOption) != 0
+            if leftCmdSet != leftOptSet {
+                newRaw ^= SideMask.leftCommand
+                newRaw ^= SideMask.leftOption
+            }
+        }
+
+        // Swap device side bits for right modifiers
+        if state.swapRightCmdOpt {
+            let rightCmdSet = (rawFlags & SideMask.rightCommand) != 0
+            let rightOptSet = (rawFlags & SideMask.rightOption) != 0
+            if rightCmdSet != rightOptSet {
+                newRaw ^= SideMask.rightCommand
+                newRaw ^= SideMask.rightOption
+            }
+        }
+
+        event.flags = CGEventFlags(rawValue: newRaw)
     }
 
     // MARK: - 功能 4：F1-F12 媒体键转标准功能键
