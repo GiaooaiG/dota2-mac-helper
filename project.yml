@@ -1,0 +1,47 @@
+name: DotaMacHelper
+options:
+  bundleIdPrefix: com.dotamac
+  deploymentTarget:
+    macOS: "14.0"
+  developmentLanguage: zh-Hans
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: YES
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEAD_CODE_STRIPPING: YES
+targets:
+  DotaMacHelper:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/DotaMacHelper
+    resources:
+      - path: Resources/Assets.xcassets
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleName: DotaMacHelper
+        CFBundleDisplayName: "Dota Mac 助手"
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0.0"
+        LSMinimumSystemVersion: "14.0"
+        LSUIElement: YES
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: "© 2026 DotaMacHelper"
+    entitlements:
+      path: Resources/DotaMacHelper.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dotamac.helper
+        PRODUCT_NAME: DotaMacHelper

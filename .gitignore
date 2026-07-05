@@ -1,0 +1,44 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.playground/
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# xcodegen 生成的项目文件
+DotaMacHelper.xcodeproj
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# 构建产物
+*.app
+*.o
+*.a
+
+# 临时文件
+*.log
+*.tmp
+*.bak
+
+# IDE
+.vscode/
+.idea/
+
+# opencode 工作目录
+.omo/
+.hermes/
