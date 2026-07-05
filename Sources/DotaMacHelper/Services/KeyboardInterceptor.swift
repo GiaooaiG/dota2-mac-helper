@@ -1,4 +1,4 @@
-import CoreGraphics
+@preconcurrency import CoreGraphics
 import ApplicationServices
 import AppKit
 
@@ -128,8 +128,7 @@ final class KeyboardInterceptor {
         case .flagsChanged:
             // 交换修饰键
             if state.swapLeftCmdOpt || state.swapRightCmdOpt {
-                let result = handleSwapModifiers(event: event)
-                if result == nil { return nil } // 原始事件已吞掉（已重发合成事件）
+                return handleSwapModifiers(event: event)
             }
         default:
             break
@@ -189,125 +188,115 @@ final class KeyboardInterceptor {
         // 左侧交换
         if state.swapLeftCmdOpt {
             if isDown(ModKey.leftCommand, side: SideMask.leftCommand) {
-                return synthAndSwap(from: ModKey.leftCommand,
+                modifyModifierEvent(event: event, from: ModKey.leftCommand,
                                     to: ModKey.leftOption,
                                     isDown: true,
                                     srcSide: SideMask.leftCommand,
-                                    dstSide: SideMask.leftOption,
-                                    originalEvent: event)
+                                    dstSide: SideMask.leftOption)
+                return Unmanaged.passUnretained(event)
             }
             if isUp(ModKey.leftCommand, side: SideMask.leftCommand) {
-                return synthAndSwap(from: ModKey.leftCommand,
+                modifyModifierEvent(event: event, from: ModKey.leftCommand,
                                     to: ModKey.leftOption,
                                     isDown: false,
                                     srcSide: SideMask.leftCommand,
-                                    dstSide: SideMask.leftOption,
-                                    originalEvent: event)
+                                    dstSide: SideMask.leftOption)
+                return Unmanaged.passUnretained(event)
             }
             if isDown(ModKey.leftOption, side: SideMask.leftOption) {
-                return synthAndSwap(from: ModKey.leftOption,
+                modifyModifierEvent(event: event, from: ModKey.leftOption,
                                     to: ModKey.leftCommand,
                                     isDown: true,
                                     srcSide: SideMask.leftOption,
-                                    dstSide: SideMask.leftCommand,
-                                    originalEvent: event)
+                                    dstSide: SideMask.leftCommand)
+                return Unmanaged.passUnretained(event)
             }
             if isUp(ModKey.leftOption, side: SideMask.leftOption) {
-                return synthAndSwap(from: ModKey.leftOption,
+                modifyModifierEvent(event: event, from: ModKey.leftOption,
                                     to: ModKey.leftCommand,
                                     isDown: false,
                                     srcSide: SideMask.leftOption,
-                                    dstSide: SideMask.leftCommand,
-                                    originalEvent: event)
+                                    dstSide: SideMask.leftCommand)
+                return Unmanaged.passUnretained(event)
             }
         }
 
         // 右侧交换
         if state.swapRightCmdOpt {
             if isDown(ModKey.rightCommand, side: SideMask.rightCommand) {
-                return synthAndSwap(from: ModKey.rightCommand,
+                modifyModifierEvent(event: event, from: ModKey.rightCommand,
                                     to: ModKey.rightOption,
                                     isDown: true,
                                     srcSide: SideMask.rightCommand,
-                                    dstSide: SideMask.rightOption,
-                                    originalEvent: event)
+                                    dstSide: SideMask.rightOption)
+                return Unmanaged.passUnretained(event)
             }
             if isUp(ModKey.rightCommand, side: SideMask.rightCommand) {
-                return synthAndSwap(from: ModKey.rightCommand,
+                modifyModifierEvent(event: event, from: ModKey.rightCommand,
                                     to: ModKey.rightOption,
                                     isDown: false,
                                     srcSide: SideMask.rightCommand,
-                                    dstSide: SideMask.rightOption,
-                                    originalEvent: event)
+                                    dstSide: SideMask.rightOption)
+                return Unmanaged.passUnretained(event)
             }
             if isDown(ModKey.rightOption, side: SideMask.rightOption) {
-                return synthAndSwap(from: ModKey.rightOption,
+                modifyModifierEvent(event: event, from: ModKey.rightOption,
                                     to: ModKey.rightCommand,
                                     isDown: true,
                                     srcSide: SideMask.rightOption,
-                                    dstSide: SideMask.rightCommand,
-                                    originalEvent: event)
+                                    dstSide: SideMask.rightCommand)
+                return Unmanaged.passUnretained(event)
             }
             if isUp(ModKey.rightOption, side: SideMask.rightOption) {
-                return synthAndSwap(from: ModKey.rightOption,
+                modifyModifierEvent(event: event, from: ModKey.rightOption,
                                     to: ModKey.rightCommand,
                                     isDown: false,
                                     srcSide: SideMask.rightOption,
-                                    dstSide: SideMask.rightCommand,
-                                    originalEvent: event)
+                                    dstSide: SideMask.rightCommand)
+                return Unmanaged.passUnretained(event)
             }
         }
 
         return Unmanaged.passUnretained(event)
     }
 
-    /// 合成目标修饰键的 flagsChanged 事件，并吞掉原始事件
+    /// In-place 修改 flagsChanged 事件的修饰键映射，修改完直接放行原事件
+    /// （不吞掉，不合成新事件 — 保持 flagsChanged 类型让系统正确解释修饰键状态变化）
     @MainActor
-    private func synthAndSwap(
+    private func modifyModifierEvent(
+        event: CGEvent,
         from srcKey: CGKeyCode,
         to dstKey: CGKeyCode,
         isDown: Bool,
         srcSide: UInt64,
-        dstSide: UInt64,
-        originalEvent: CGEvent
-    ) -> Unmanaged<CGEvent>? {
-        let source = CGEventSource(stateID: .hidSystemState)
-        guard let synth = CGEvent(
-            keyboardEventSource: source,
-            virtualKey: dstKey,
-            keyDown: isDown
-        ) else {
-            return Unmanaged.passUnretained(originalEvent) // 合成失败，放行原始
-        }
+        dstSide: UInt64
+    ) {
+        // 1. 修改 keyCode：让系统认为目标修饰键发生了变化
+        event.setIntegerValueField(.keyboardEventKeycode, value: Int64(dstKey))
 
-        // 标记合成事件，防回环
-        synth.setIntegerValueField(.eventSourceUserData, value: Self.synthMagic)
+        // 2. 标记已处理（防回环 — 如果事件因某种原因重新进入 tap）
+        event.setIntegerValueField(.eventSourceUserData, value: Self.synthMagic)
 
-        // 重建 flags：保留其他修饰键，清除源侧位 bit，设置目标侧位 bit
-        var newRaw = originalEvent.flags.rawValue
+        // 3. 重建 flags：侧位 bit（IOKit 设备位）
+        var newRaw = event.flags.rawValue
+        newRaw &= ~srcSide
         if isDown {
-            newRaw &= ~srcSide      // 清源侧位
-            newRaw |= dstSide       // 设目标侧位
+            newRaw |= dstSide
         } else {
-            newRaw &= ~srcSide      // 抬起时清源侧位
-            newRaw &= ~dstSide      // 也清目标侧位
+            newRaw &= ~dstSide
         }
 
-        // 公开 flags（maskCommand / maskAlternate）也要相应调整
+        // 4. 重建公开 flags（maskCommand / maskAlternate）
         let srcPublic = publicFlag(for: srcKey)
         let dstPublic = publicFlag(for: dstKey)
         newRaw &= ~srcPublic.rawValue
         if isDown {
             newRaw |= dstPublic.rawValue
         } else {
-            // 抬起时也要清目标公开 flag，否则合成 keyUp 后目标修饰键状态残留
-            newRaw &= ~dstPublic.rawValue
+            newRaw &= ~dstPublic.rawValue  // P0 fix: 抬起时也清目标公开 flag
         }
 
-        synth.flags = CGEventFlags(rawValue: newRaw)
-        synth.post(tap: .cghidEventTap)
-
-        return nil // 吞掉原始事件
+        event.flags = CGEventFlags(rawValue: newRaw)
     }
 
     private func publicFlag(for key: CGKeyCode) -> CGEventFlags {
