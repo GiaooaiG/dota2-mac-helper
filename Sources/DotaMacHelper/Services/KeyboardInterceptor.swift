@@ -134,8 +134,10 @@ final class KeyboardInterceptor {
                 if result == nil { return nil } // 已吞掉
             }
         case .flagsChanged:
+            // 交换修饰键
             if state.swapLeftCmdOpt || state.swapRightCmdOpt {
-                _ = handleSwapModifiers(event: event) // in-place 修改，放行原事件
+                let result = handleSwapModifiers(event: event)
+                if result == nil { return nil }
             }
         default:
             break
@@ -153,7 +155,7 @@ final class KeyboardInterceptor {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
-        if flags.contains(.maskCommand) && (keyCode == 12 || keyCode == 13) { // Q=12, W=13 — PC 键盘上可能映射到同一物理键
+        if flags.contains(.maskCommand) && keyCode == 12 { // kVK_ANSI_Q = 0x0C = 12
             return nil // 吞掉，下游看不到
         }
         return Unmanaged.passUnretained(event)
@@ -177,7 +179,7 @@ final class KeyboardInterceptor {
         static let rightOption:  CGKeyCode = 0x3D // 61
     }
 
-    /// 处理 flagsChanged：检测物理修饰键按下/抬起，in-place 修改事件字段后放行
+    /// 处理 flagsChanged：根据开关决定是否重映射（吞掉原始事件，投递合成事件）
     @MainActor
     private func handleSwapModifiers(event: CGEvent) -> Unmanaged<CGEvent>? {
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
@@ -195,107 +197,124 @@ final class KeyboardInterceptor {
         // 左侧交换
         if state.swapLeftCmdOpt {
             if isDown(ModKey.leftCommand, side: SideMask.leftCommand) {
-                modifyModifierInPlace(event: event, from: ModKey.leftCommand,
-                                      to: ModKey.leftOption,
-                                      isDown: true,
-                                      srcSide: SideMask.leftCommand,
-                                      dstSide: SideMask.leftOption)
-                return Unmanaged.passUnretained(event)
+                return synthAndSwap(from: ModKey.leftCommand,
+                                    to: ModKey.leftOption,
+                                    isDown: true,
+                                    srcSide: SideMask.leftCommand,
+                                    dstSide: SideMask.leftOption,
+                                    originalEvent: event)
             }
             if isUp(ModKey.leftCommand, side: SideMask.leftCommand) {
-                modifyModifierInPlace(event: event, from: ModKey.leftCommand,
-                                      to: ModKey.leftOption,
-                                      isDown: false,
-                                      srcSide: SideMask.leftCommand,
-                                      dstSide: SideMask.leftOption)
-                return Unmanaged.passUnretained(event)
+                return synthAndSwap(from: ModKey.leftCommand,
+                                    to: ModKey.leftOption,
+                                    isDown: false,
+                                    srcSide: SideMask.leftCommand,
+                                    dstSide: SideMask.leftOption,
+                                    originalEvent: event)
             }
             if isDown(ModKey.leftOption, side: SideMask.leftOption) {
-                modifyModifierInPlace(event: event, from: ModKey.leftOption,
-                                      to: ModKey.leftCommand,
-                                      isDown: true,
-                                      srcSide: SideMask.leftOption,
-                                      dstSide: SideMask.leftCommand)
-                return Unmanaged.passUnretained(event)
+                return synthAndSwap(from: ModKey.leftOption,
+                                    to: ModKey.leftCommand,
+                                    isDown: true,
+                                    srcSide: SideMask.leftOption,
+                                    dstSide: SideMask.leftCommand,
+                                    originalEvent: event)
             }
             if isUp(ModKey.leftOption, side: SideMask.leftOption) {
-                modifyModifierInPlace(event: event, from: ModKey.leftOption,
-                                      to: ModKey.leftCommand,
-                                      isDown: false,
-                                      srcSide: SideMask.leftOption,
-                                      dstSide: SideMask.leftCommand)
-                return Unmanaged.passUnretained(event)
+                return synthAndSwap(from: ModKey.leftOption,
+                                    to: ModKey.leftCommand,
+                                    isDown: false,
+                                    srcSide: SideMask.leftOption,
+                                    dstSide: SideMask.leftCommand,
+                                    originalEvent: event)
             }
         }
 
         // 右侧交换
         if state.swapRightCmdOpt {
             if isDown(ModKey.rightCommand, side: SideMask.rightCommand) {
-                modifyModifierInPlace(event: event, from: ModKey.rightCommand,
-                                      to: ModKey.rightOption,
-                                      isDown: true,
-                                      srcSide: SideMask.rightCommand,
-                                      dstSide: SideMask.rightOption)
-                return Unmanaged.passUnretained(event)
+                return synthAndSwap(from: ModKey.rightCommand,
+                                    to: ModKey.rightOption,
+                                    isDown: true,
+                                    srcSide: SideMask.rightCommand,
+                                    dstSide: SideMask.rightOption,
+                                    originalEvent: event)
             }
             if isUp(ModKey.rightCommand, side: SideMask.rightCommand) {
-                modifyModifierInPlace(event: event, from: ModKey.rightCommand,
-                                      to: ModKey.rightOption,
-                                      isDown: false,
-                                      srcSide: SideMask.rightCommand,
-                                      dstSide: SideMask.rightOption)
-                return Unmanaged.passUnretained(event)
+                return synthAndSwap(from: ModKey.rightCommand,
+                                    to: ModKey.rightOption,
+                                    isDown: false,
+                                    srcSide: SideMask.rightCommand,
+                                    dstSide: SideMask.rightOption,
+                                    originalEvent: event)
             }
             if isDown(ModKey.rightOption, side: SideMask.rightOption) {
-                modifyModifierInPlace(event: event, from: ModKey.rightOption,
-                                      to: ModKey.rightCommand,
-                                      isDown: true,
-                                      srcSide: SideMask.rightOption,
-                                      dstSide: SideMask.rightCommand)
-                return Unmanaged.passUnretained(event)
+                return synthAndSwap(from: ModKey.rightOption,
+                                    to: ModKey.rightCommand,
+                                    isDown: true,
+                                    srcSide: SideMask.rightOption,
+                                    dstSide: SideMask.rightCommand,
+                                    originalEvent: event)
             }
             if isUp(ModKey.rightOption, side: SideMask.rightOption) {
-                modifyModifierInPlace(event: event, from: ModKey.rightOption,
-                                      to: ModKey.rightCommand,
-                                      isDown: false,
-                                      srcSide: SideMask.rightOption,
-                                      dstSide: SideMask.rightCommand)
-                return Unmanaged.passUnretained(event)
+                return synthAndSwap(from: ModKey.rightOption,
+                                    to: ModKey.rightCommand,
+                                    isDown: false,
+                                    srcSide: SideMask.rightOption,
+                                    dstSide: SideMask.rightCommand,
+                                    originalEvent: event)
             }
         }
 
         return Unmanaged.passUnretained(event)
     }
 
-    /// In-place 修改 flagsChanged 事件的 keyCode 和 flags，直接放行（不合成新事件）
-    /// 配合 swapModifierFlags 在 keyDown/keyUp 上交换 flags，实现完整的修饰键映射
+    /// 合成目标修饰键的 flagsChanged 事件，并吞掉原始事件
+    /// - 吞掉原始 flagsChanged，合成目标修饰键的 flagsChanged 投递到 .cgSessionEventTap
+    /// - .cgSessionEventTap 确保系统通过正常事件管线更新内部修饰键状态
     @MainActor
-    private func modifyModifierInPlace(
-        event: CGEvent,
+    private func synthAndSwap(
         from srcKey: CGKeyCode,
         to dstKey: CGKeyCode,
         isDown: Bool,
         srcSide: UInt64,
-        dstSide: UInt64
-    ) {
-        // 1. 修改 keyCode：让下游系统认为目标修饰键发生了变化
-        event.setIntegerValueField(.keyboardEventKeycode, value: Int64(dstKey))
-
-        // 2. 标记已处理（防回环）
-        event.setIntegerValueField(.eventSourceUserData, value: Self.synthMagic)
-
-        // 3. 重建 flags：侧位 bit
-        var newRaw = event.flags.rawValue
+        dstSide: UInt64,
+        originalEvent: CGEvent
+    ) -> Unmanaged<CGEvent>? {
+        // 重建 flags：侧位 bit（IOKit 设备位）
+        var newRaw = originalEvent.flags.rawValue
         newRaw &= ~srcSide
-        if isDown { newRaw |= dstSide } else { newRaw &= ~dstSide }
+        if isDown {
+            newRaw |= dstSide
+        } else {
+            newRaw &= ~dstSide
+        }
 
-        // 4. 重建公开 flags（maskCommand / maskAlternate）
+        // 公开 flags（maskCommand / maskAlternate）
         let srcPublic = publicFlag(for: srcKey)
         let dstPublic = publicFlag(for: dstKey)
         newRaw &= ~srcPublic.rawValue
-        if isDown { newRaw |= dstPublic.rawValue } else { newRaw &= ~dstPublic.rawValue }
+        if isDown {
+            newRaw |= dstPublic.rawValue
+        } else {
+            newRaw &= ~dstPublic.rawValue
+        }
 
-        event.flags = CGEventFlags(rawValue: newRaw)
+        // 关键：创建 event 后手动设置为 .flagsChanged 类型
+        // 使用 nil source 让系统按合成事件处理，走正常的事件管线
+        guard let synth = CGEvent(keyboardEventSource: nil, virtualKey: dstKey, keyDown: isDown) else {
+            return nil // 合成失败：吞掉原事件（不下游产生错误的修饰键状态）
+        }
+
+        synth.type = .flagsChanged  //  此事件类型让系统正确更新内部修饰键状态
+        synth.flags = CGEventFlags(rawValue: newRaw)
+        synth.setIntegerValueField(.eventSourceUserData, value: Self.synthMagic)
+
+        // 投递到 .cgSessionEventTap（而非 .cghidEventTap）
+        // .cgSessionEventTap 让合成事件走 session 级事件管线，系统会据此更新内部状态
+        synth.post(tap: .cgSessionEventTap)
+
+        return nil // 吞掉原始事件
     }
 
     private func publicFlag(for key: CGKeyCode) -> CGEventFlags {
